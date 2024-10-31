@@ -137,22 +137,40 @@ function solved(rowUsed, colUsed, colorUsed) {
 }
 
 function getCandidates(game, rowUsed, colUsed, colorUsed, adjacentToUsed) {
+  // How many free spots are possible for a given row, col, and color.
+  const rowToSpots = Array(game.rows).fill(0);
+  const colToSpots = Array(game.cols).fill(0);
+  const colorToSpots = Array(game.colors.length).fill(0);
+
   const candidates = [];
 
   for (let row = 0; row < game.rows; row++) {
     for (let col = 0; col < game.cols; col++) {
       const idx = row * game.cols + col;
+
       if (
         !rowUsed[row] &&
         !colUsed[col] &&
         !colorUsed[game.idxToColor[idx]] &&
         adjacentToUsed[idx] === 0
       ) {
+        rowToSpots[row]++;
+        colToSpots[col]++;
+        colorToSpots[game.idxToColor[idx]]++;
         candidates.push([row, col]);
       }
     }
   }
 
+  function key([row, col]) {
+    return Math.min(
+      rowToSpots[row],
+      colToSpots[col],
+      colorToSpots[game.idxToColor[row * game.cols + col]]
+    );
+  }
+
+  candidates.sort((a, b) => key(a) - key(b));
   return candidates;
 }
 
@@ -165,12 +183,12 @@ function solveGame() {
     const idx = parseInt(child.dataset.cellIdx);
 
     if (solution.has(idx)) {
-      addRedOverlay(child);
+      addBorder(child);
     }
   }
 }
 
-function addRedOverlay(element) {
+function addBorder(element) {
   // Create the overlay div
   const overlay = document.createElement("div");
 
@@ -180,9 +198,8 @@ function addRedOverlay(element) {
   overlay.style.left = 0;
   overlay.style.width = "100%";
   overlay.style.height = "100%";
-  overlay.style.backgroundColor = "rgba(255, 0, 0, 0.5)"; // Red with 50% opacity
   overlay.style.pointerEvents = "none"; // Allows clicks to go through the overlay
-  overlay.style.border = "3px solid red";
+  overlay.style.border = "4px dashed black";
   overlay.style.boxSizing = "border-box";
 
   // Position the parent element to relative if not already set
@@ -195,4 +212,4 @@ function addRedOverlay(element) {
   element.appendChild(overlay);
 }
 
-setTimeout(solveGame, 2000);
+solveGame();
