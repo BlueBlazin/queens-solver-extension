@@ -162,6 +162,20 @@ function getCandidates(game, rowUsed, colUsed, colorUsed, adjacentToUsed) {
     }
   }
 
+  // Forward checking optimization.
+  if (
+    forwardCheckFailure(
+      rowUsed,
+      colUsed,
+      colorUsed,
+      rowToSpots,
+      colToSpots,
+      colorToSpots
+    )
+  ) {
+    return [];
+  }
+
   function key([row, col]) {
     return Math.min(
       rowToSpots[row],
@@ -170,8 +184,36 @@ function getCandidates(game, rowUsed, colUsed, colorUsed, adjacentToUsed) {
     );
   }
 
+  // Variable ordering heuristic optimization.
   candidates.sort((a, b) => key(a) - key(b));
   return candidates;
+}
+
+function forwardCheckFailure(
+  rowUsed,
+  colUsed,
+  colorUsed,
+  rowToSpots,
+  colToSpots,
+  colorToSpots
+) {
+  if (rowUsed.some((used, row) => !used && rowToSpots[row] === 0)) {
+    return true;
+  }
+
+  if (colUsed.some((used, col) => !used && colToSpots[col] === 0)) {
+    return true;
+  }
+
+  if (
+    Object.entries(colorUsed).some(
+      ([color, used]) => !used && colorToSpots[color] === 0
+    )
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function solveGame() {

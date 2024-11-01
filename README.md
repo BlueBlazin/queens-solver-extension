@@ -6,5 +6,8 @@ Backtracking based solver with a simple optimization.
 
 ## Timeline
 
+- **2024-11-01:** Add forward checking optimization.
+  - Queens #185 solution time down from 11s to 0.3s.
 - **2024-10-31:** Add dynamic variable ordering optimization.
+  - Queens #184 solution time down from 45 minutes to 2s.
 - **2024-10-30:** Naive backtracking based solver.
