@@ -212,4 +212,7 @@ function addBorder(element) {
   element.appendChild(overlay);
 }
 
+console.log("Solving...");
+const start = Date.now();
 solveGame();
+console.log(`Solved! (${(Date.now() - start) / 1000.0}s)`);
