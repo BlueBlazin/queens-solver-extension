@@ -6,6 +6,8 @@ Fast backtracking based solver with a few optimizations.
 
 ## Timeline
 
+- **2024-11-02:** Rewrite solver in Rust and compile to WASM.
+  - Queens #186 solution time down from 10s to 3.9s.
 - **2024-11-01:** Add forward checking optimization.
   - Queens #185 solution time down from 11s to 0.3s.
 - **2024-10-31:** Add dynamic variable ordering optimization.
