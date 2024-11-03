@@ -47,8 +47,9 @@ impl NoGoods {
 
         for idx in solution {
             current = current.children.entry(idx).or_insert(TrieNode::new());
-            current.is_leaf = true;
         }
+
+        current.is_leaf = true;
     }
 
     pub fn search(&self, mut solution: Vec<usize>) -> bool {
