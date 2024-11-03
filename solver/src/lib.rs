@@ -2,6 +2,7 @@ mod utils;
 
 use serde::Deserialize;
 use serde_json;
+use std::collections::HashMap;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
@@ -14,6 +15,60 @@ struct Game {
     idx_to_color: Vec<usize>,
 }
 
+struct TrieNode {
+    pub children: HashMap<usize, TrieNode>,
+    pub is_leaf: bool,
+}
+
+impl TrieNode {
+    fn new() -> Self {
+        Self {
+            children: HashMap::new(),
+            is_leaf: false,
+        }
+    }
+}
+
+struct NoGoods {
+    root: TrieNode,
+}
+
+impl NoGoods {
+    fn new() -> Self {
+        Self {
+            root: TrieNode::new(),
+        }
+    }
+
+    pub fn insert(&mut self, mut solution: Vec<usize>) {
+        solution.sort();
+
+        let mut current = &mut self.root;
+
+        for idx in solution {
+            current = current.children.entry(idx).or_insert(TrieNode::new());
+        }
+
+        current.is_leaf = true;
+    }
+
+    pub fn search(&self, mut solution: Vec<usize>) -> bool {
+        solution.sort();
+
+        let mut current = &self.root;
+
+        for idx in solution {
+            if let Some(child) = current.children.get(&idx) {
+                current = child;
+            } else {
+                return false;
+            }
+        }
+
+        current.is_leaf
+    }
+}
+
 #[wasm_bindgen]
 pub fn solve(game_json: String) -> String {
     set_panic_hook();
@@ -23,6 +78,7 @@ pub fn solve(game_json: String) -> String {
     let mut is_col_used = vec![false; game.cols];
     let mut is_color_used = vec![false; game.colors.len()];
     let mut adj_to_used = vec![0usize; game.rows * game.cols];
+    let mut nogoods = NoGoods::new();
     let mut solution = vec![];
 
     solve_backtracking(
@@ -31,6 +87,7 @@ pub fn solve(game_json: String) -> String {
         &mut is_col_used,
         &mut is_color_used,
         &mut adj_to_used,
+        &mut nogoods,
         &mut solution,
     );
 
@@ -43,6 +100,7 @@ fn solve_backtracking(
     is_col_used: &mut [bool],
     is_color_used: &mut [bool],
     adj_to_used: &mut [usize],
+    nogoods: &mut NoGoods,
     solution: &mut Vec<usize>,
 ) -> bool {
     if is_solved(is_row_used, is_col_used, is_color_used) {
@@ -51,6 +109,14 @@ fn solve_backtracking(
 
     for (row, col) in get_candidates(game, is_row_used, is_col_used, is_color_used, adj_to_used) {
         let idx = row * game.cols + col;
+
+        // No goods optimization.
+        solution.push(idx);
+        if nogoods.search(solution.clone()) {
+            solution.pop();
+            continue;
+        }
+
         let adjacents = get_adjacent_idxs(game, row, col);
 
         // Put a queen on this square.
@@ -60,7 +126,6 @@ fn solve_backtracking(
         for &i in &adjacents {
             adj_to_used[i] += 1;
         }
-        solution.push(idx);
 
         if solve_backtracking(
             game,
@@ -68,6 +133,7 @@ fn solve_backtracking(
             is_col_used,
             is_color_used,
             adj_to_used,
+            nogoods,
             solution,
         ) {
             return true;
@@ -82,6 +148,9 @@ fn solve_backtracking(
         }
         solution.pop();
     }
+
+    // Add this combination of indices to the no goods cache.
+    nogoods.insert(solution.clone());
 
     false
 }
