@@ -29,6 +29,10 @@ impl TrieNode {
     }
 }
 
+/// The `NoGoods` cache stores combinations of indices that _cannot_ lead to a valid solution.
+///
+/// The cache allows efficient checking of potential solutions against known bad partial
+/// solutions using a Trie implementation.
 struct NoGoods {
     root: TrieNode,
 }
@@ -40,6 +44,7 @@ impl NoGoods {
         }
     }
 
+    /// Inserts a bad partial-solution into the no goods cache.
     pub fn insert(&mut self, mut solution: Vec<usize>) {
         solution.sort();
 
@@ -52,6 +57,11 @@ impl NoGoods {
         current.is_leaf = true;
     }
 
+    /// Searches the cache to see if the current solution contains any bad combination of elements.
+    ///
+    /// If any known bad partial solution set is a subset of `solution`, then we know `solution` cannot be valid.
+    /// This is because it's known that a bad partial solution cannot lead to an eventually correct solution.
+    /// In other words the `solution` is futile.
     pub fn search(&self, mut solution: Vec<usize>) -> bool {
         solution.sort();
 
@@ -60,12 +70,17 @@ impl NoGoods {
         for idx in solution {
             if let Some(child) = current.children.get(&idx) {
                 current = child;
+
+                // A bad partial solution is a subset of `solution`.
+                if current.is_leaf {
+                    return true;
+                }
             } else {
                 return false;
             }
         }
 
-        current.is_leaf
+        false
     }
 }
 

@@ -7,7 +7,7 @@ Super fast, optimized, WASM compiled backtracking based solver.
 ## Timeline
 
 - **2024-11-03:** Add nogoods checking optimization.
-  - Queens #186 solution time down from 3.9s to 0.25s.
+  - Queens #186 solution time down from 3.9s to 0.17s.
 - **2024-11-02:** Rewrite solver in Rust and compile to WASM.
   - Queens #186 solution time down from 10s to 3.9s.
 - **2024-11-01:** Add forward checking optimization.
