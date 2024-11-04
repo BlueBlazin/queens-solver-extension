@@ -15,6 +15,83 @@ struct Game {
     idx_to_color: Vec<usize>,
 }
 
+/// Pre-computed table of adjacent indices.
+struct AdjacentsLookup {
+    adjacents: Vec<Vec<usize>>,
+    counts: Vec<usize>,
+}
+
+impl AdjacentsLookup {
+    fn new(rows: usize, cols: usize) -> Self {
+        let mut adjacents = vec![Vec::with_capacity(4); rows * cols];
+        let counts = vec![0; rows * cols];
+
+        for row in 0..rows {
+            for col in 0..cols {
+                for (dr, dc) in [(-1, -1), (-1, 1), (1, -1), (1, 1)] {
+                    let new_row = (row as i32) + dr;
+                    let new_col = (col as i32) + dc;
+
+                    if new_row >= 0
+                        && new_row < (rows as i32)
+                        && new_col >= 0
+                        && new_col < (cols as i32)
+                    {
+                        adjacents[row * cols + col]
+                            .push((new_row as usize) * cols + (new_col as usize));
+                    }
+                }
+            }
+        }
+
+        Self { adjacents, counts }
+    }
+}
+
+struct UsedTracker {
+    rows: u64,
+    cols: u64,
+    colors: u64,
+    required_rows: u64,
+    required_cols: u64,
+    required_colors: u64,
+}
+
+impl UsedTracker {
+    fn new(num_rows: usize, num_cols: usize, num_colors: usize) -> Self {
+        Self {
+            rows: 0,
+            cols: 0,
+            colors: 0,
+            required_rows: (1 << num_rows) - 1,
+            required_cols: (1 << num_cols) - 1,
+            required_colors: (1 << num_colors) - 1,
+        }
+    }
+
+    #[inline(always)]
+    fn is_used(&self, row: usize, col: usize, color: usize) -> bool {
+        ((self.rows >> row) & 1 == 1)
+            || ((self.cols >> col) & 1 == 1)
+            || ((self.colors >> color) & 1 == 1)
+    }
+
+    #[inline(always)]
+    fn set(&mut self, row: usize, col: usize, color: usize, value: bool) {
+        let bit: u64 = if value { 1 } else { 0 };
+        self.rows = (self.rows & !(1 << row)) | (bit << row);
+        self.cols = (self.cols & !(1 << col)) | (bit << col);
+        self.colors = (self.colors & !(1 << color)) | (bit << color);
+    }
+
+    #[inline(always)]
+    fn is_solved(&self) -> bool {
+        (self.rows == self.required_rows)
+            && (self.cols == self.required_cols)
+            && (self.colors == self.required_colors)
+    }
+}
+
 struct TrieNode {
     pub children: HashMap<usize, TrieNode>,
     pub is_leaf: bool,
@@ -46,7 +123,7 @@ impl NoGoods {
 
     /// Inserts a bad partial-solution into the no goods cache.
     pub fn insert(&mut self, mut solution: Vec<usize>) {
-        solution.sort();
+        solution.sort_unstable();
 
         let mut current = &mut self.root;
 
@@ -63,7 +140,7 @@ impl NoGoods {
     /// This is because it's known that a bad partial solution cannot lead to an eventually correct solution.
     /// In other words the `solution` is futile.
     pub fn search(&self, mut solution: Vec<usize>) -> bool {
-        solution.sort();
+        solution.sort_unstable();
 
         let mut current = &self.root;
 
@@ -89,19 +166,15 @@ pub fn solve(game_json: String) -> String {
     set_panic_hook();
     let game: Game = serde_json::from_str(&game_json).unwrap();
 
-    let mut is_row_used = vec![false; game.rows];
-    let mut is_col_used = vec![false; game.cols];
-    let mut is_color_used = vec![false; game.colors.len()];
-    let mut adj_to_used = vec![0usize; game.rows * game.cols];
+    let mut used = UsedTracker::new(game.rows, game.cols, game.colors.len());
+    let mut adj_lookup = AdjacentsLookup::new(game.rows, game.cols);
     let mut nogoods = NoGoods::new();
     let mut solution = vec![];
 
     solve_backtracking(
         &game,
-        &mut is_row_used,
-        &mut is_col_used,
-        &mut is_color_used,
-        &mut adj_to_used,
+        &mut used,
+        &mut adj_lookup,
         &mut nogoods,
         &mut solution,
     );
@@ -111,19 +184,18 @@ pub fn solve(game_json: String) -> String {
 
 fn solve_backtracking(
     game: &Game,
-    is_row_used: &mut [bool],
-    is_col_used: &mut [bool],
-    is_color_used: &mut [bool],
-    adj_to_used: &mut [usize],
+    used: &mut UsedTracker,
+    adj_lookup: &mut AdjacentsLookup,
     nogoods: &mut NoGoods,
     solution: &mut Vec<usize>,
 ) -> bool {
-    if is_solved(is_row_used, is_col_used, is_color_used) {
+    if used.is_solved() {
         return true;
     }
 
-    for (row, col) in get_candidates(game, is_row_used, is_col_used, is_color_used, adj_to_used) {
+    for (row, col) in get_candidates(game, used, adj_lookup) {
         let idx = row * game.cols + col;
+        let color = game.idx_to_color[idx];
 
         // No goods optimization.
         solution.push(idx);
@@ -132,34 +204,20 @@ fn solve_backtracking(
             continue;
         }
 
-        let adjacents = get_adjacent_idxs(game, row, col);
-
         // Put a queen on this square.
-        is_row_used[row] = true;
-        is_col_used[col] = true;
-        is_color_used[game.idx_to_color[idx]] = true;
-        for &i in &adjacents {
-            adj_to_used[i] += 1;
+        used.set(row, col, color, true);
+        for &i in &adj_lookup.adjacents[idx] {
+            adj_lookup.counts[i] += 1;
         }
 
-        if solve_backtracking(
-            game,
-            is_row_used,
-            is_col_used,
-            is_color_used,
-            adj_to_used,
-            nogoods,
-            solution,
-        ) {
+        if solve_backtracking(game, used, adj_lookup, nogoods, solution) {
             return true;
         }
 
         // Backtrack and continue.
-        is_row_used[row] = false;
-        is_col_used[col] = false;
-        is_color_used[game.idx_to_color[idx]] = false;
-        for &i in &adjacents {
-            adj_to_used[i] -= 1;
+        used.set(row, col, color, false);
+        for &i in &adj_lookup.adjacents[idx] {
+            adj_lookup.counts[i] -= 1;
         }
         solution.pop();
     }
@@ -170,39 +228,11 @@ fn solve_backtracking(
     false
 }
 
-#[inline]
-fn get_adjacent_idxs(game: &Game, row: usize, col: usize) -> Vec<usize> {
-    let mut adjacents = vec![];
-
-    for (dr, dc) in [(-1, -1), (-1, 1), (1, -1), (1, 1)] {
-        let new_row = (row as i32) + dr;
-        let new_col = (col as i32) + dc;
-
-        if new_row >= 0
-            && new_row < (game.rows as i32)
-            && new_col >= 0
-            && new_col < (game.cols as i32)
-        {
-            adjacents.push((new_row as usize) * game.cols + (new_col as usize));
-        }
-    }
-
-    adjacents
-}
-
-#[inline]
-fn is_solved(is_row_used: &[bool], is_col_used: &[bool], is_color_used: &[bool]) -> bool {
-    is_row_used.iter().all(|&x| x)
-        && is_col_used.iter().all(|&x| x)
-        && is_color_used.iter().all(|&x| x)
-}
-
+#[inline(always)]
 fn get_candidates(
     game: &Game,
-    is_row_used: &[bool],
-    is_col_used: &[bool],
-    is_color_used: &[bool],
-    adj_to_used: &[usize],
+    used: &UsedTracker,
+    adj_lookup: &AdjacentsLookup,
 ) -> Vec<(usize, usize)> {
     let mut row_to_spots = vec![0usize; game.rows];
     let mut col_to_spots = vec![0usize; game.cols];
@@ -215,11 +245,7 @@ fn get_candidates(
             let idx = row * game.cols + col;
             let color = game.idx_to_color[idx];
 
-            if !is_row_used[row]
-                && !is_col_used[col]
-                && !is_color_used[color]
-                && adj_to_used[idx] == 0
-            {
+            if !used.is_used(row, col, color) && (adj_lookup.counts[idx] == 0) {
                 row_to_spots[row] += 1;
                 col_to_spots[col] += 1;
                 color_to_spots[color] += 1;
@@ -229,19 +255,12 @@ fn get_candidates(
     }
 
     // Forward checking optimization.
-    if forward_check_failure(
-        is_row_used,
-        is_col_used,
-        is_color_used,
-        &row_to_spots,
-        &col_to_spots,
-        &color_to_spots,
-    ) {
+    if forward_check_failure(used, &row_to_spots, &col_to_spots, &color_to_spots) {
         return vec![];
     }
 
     // Variable ordering heuristic optimization.
-    candidates.sort_by_key(|&(row, col)| {
+    candidates.sort_unstable_by_key(|&(row, col)| {
         vec![
             row_to_spots[row],
             col_to_spots[col],
@@ -254,35 +273,26 @@ fn get_candidates(
     candidates
 }
 
-#[inline]
+#[inline(always)]
 fn forward_check_failure(
-    is_row_used: &[bool],
-    is_col_used: &[bool],
-    is_color_used: &[bool],
+    used: &UsedTracker,
     row_to_spots: &[usize],
     col_to_spots: &[usize],
     color_to_spots: &[usize],
 ) -> bool {
-    if is_row_used
-        .iter()
-        .enumerate()
-        .any(|(row, used)| !used && row_to_spots[row] == 0)
-    {
+    let rows = row_to_spots.len();
+    let cols = col_to_spots.len();
+    let colors = color_to_spots.len();
+
+    if (0..rows).any(|row| (((used.rows >> row) & 1) == 0) && (row_to_spots[row] == 0)) {
         return true;
     }
 
-    if is_col_used
-        .iter()
-        .enumerate()
-        .any(|(col, used)| !used && col_to_spots[col] == 0)
-    {
+    if (0..cols).any(|col| (((used.cols >> col) & 1) == 0) && (col_to_spots[col] == 0)) {
         return true;
     }
 
-    if is_color_used
-        .iter()
-        .enumerate()
-        .any(|(color, used)| !used && color_to_spots[color] == 0)
+    if (0..colors).any(|color| (((used.colors >> color) & 1) == 0) && (color_to_spots[color] == 0))
     {
         return true;
     }

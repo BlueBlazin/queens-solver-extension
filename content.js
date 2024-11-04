@@ -45,6 +45,19 @@ function addBorder(element) {
   element.appendChild(overlay);
 }
 
+function simulateClick(element) {
+  element.dispatchEvent(
+    new MouseEvent("mousedown", {
+      bubbles: true,
+    })
+  );
+  element.dispatchEvent(
+    new MouseEvent("mouseup", {
+      bubbles: true,
+    })
+  );
+}
+
 async function solveGame() {
   const grid = document.getElementById("queens-grid");
   const game = buildGame(grid);
@@ -60,8 +73,10 @@ async function solveGame() {
     const idx = parseInt(child.dataset.cellIdx);
 
     if (solution.has(idx)) {
-      child.click();
-      child.click();
+      // Click once for X.
+      simulateClick(child);
+      // Click twice for Queen.
+      simulateClick(child);
       addBorder(child);
     }
   }
