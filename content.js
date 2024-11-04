@@ -21,30 +21,6 @@ function buildGame(grid) {
   return { rows, cols, colors: [...colors], idxToColor };
 }
 
-function addBorder(element) {
-  // Create the overlay div
-  const overlay = document.createElement("div");
-
-  // Apply CSS styles to the overlay
-  overlay.style.position = "absolute";
-  overlay.style.top = 0;
-  overlay.style.left = 0;
-  overlay.style.width = "100%";
-  overlay.style.height = "100%";
-  overlay.style.pointerEvents = "none"; // Allows clicks to go through the overlay
-  overlay.style.border = "4px dashed black";
-  overlay.style.boxSizing = "border-box";
-
-  // Position the parent element to relative if not already set
-  const computedStyle = window.getComputedStyle(element);
-  if (computedStyle.position === "static") {
-    element.style.position = "relative";
-  }
-
-  // Append the overlay to the element
-  element.appendChild(overlay);
-}
-
 function simulateClick(element) {
   element.dispatchEvent(
     new MouseEvent("mousedown", {
@@ -77,7 +53,6 @@ async function solveGame() {
       simulateClick(child);
       // Click twice for Queen.
       simulateClick(child);
-      addBorder(child);
     }
   }
 }
