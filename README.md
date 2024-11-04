@@ -8,7 +8,7 @@ Super fast, optimized, WASM compiled backtracking based solver.
 
 ## Status
 
-**Completed**. With the final update of 2024-11-04 adding auto-clicking functionality. This project is marked as done!
+**Completed**. With the final update of 2024-11-04 adding auto-clicking functionality, this project is marked as done!
 
 ## Timeline
 
